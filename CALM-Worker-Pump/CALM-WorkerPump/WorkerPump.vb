@@ -365,15 +365,15 @@ Public NotInheritable Class WorkerPump
                         If Not ev.EventSource.parentObjs.Contains(ev.EventSource.sourceObj) Then
                             If canCastObject(Of Control)(ev.EventSource.sourceObj) And Not canCastObject(Of Form)(ev.EventSource.sourceObj) Then
                                 Dim c As Control = castObject(Of Control)(ev.EventSource.sourceObj)
-                                If menable Then c.Invoke(Sub()
-                                                             Try
-                                                                 c.Enabled = False
-                                                             Catch ex As ThreadAbortException
-                                                                 Throw ex
-                                                             Catch ex As Exception
-                                                                 RaiseEvent OnPumpException(ex)
-                                                             End Try
-                                                         End Sub)
+                                If c.TopLevelControl.Visible And menable Then c.Invoke(Sub()
+                                                                                           Try
+                                                                                               c.Enabled = False
+                                                                                           Catch ex As ThreadAbortException
+                                                                                               Throw ex
+                                                                                           Catch ex As Exception
+                                                                                               RaiseEvent OnPumpException(ex)
+                                                                                           End Try
+                                                                                       End Sub)
                             ElseIf canCastObject(Of Form)(ev.EventSource.sourceObj) Then
                                 Dim f As Form = castObject(Of Form)(ev.EventSource.sourceObj)
                                 If f.Visible And menable Then f.Invoke(Sub()
@@ -391,15 +391,15 @@ Public NotInheritable Class WorkerPump
                         If Not ev.EventSource.parentObjs.Contains(ev.EventSource.sourceObj) And en Then
                             If canCastObject(Of Control)(ev.EventSource.sourceObj) And Not canCastObject(Of Form)(ev.EventSource.sourceObj) Then
                                 Dim c As Control = castObject(Of Control)(ev.EventSource.sourceObj)
-                                If menable Then c.Invoke(Sub()
-                                                             Try
-                                                                 c.Enabled = True
-                                                             Catch ex As ThreadAbortException
-                                                                 Throw ex
-                                                             Catch ex As Exception
-                                                                 RaiseEvent OnPumpException(ex)
-                                                             End Try
-                                                         End Sub)
+                                If c.TopLevelControl.Visible And menable Then c.Invoke(Sub()
+                                                                                           Try
+                                                                                               c.Enabled = True
+                                                                                           Catch ex As ThreadAbortException
+                                                                                               Throw ex
+                                                                                           Catch ex As Exception
+                                                                                               RaiseEvent OnPumpException(ex)
+                                                                                           End Try
+                                                                                       End Sub)
                             ElseIf canCastObject(Of Form)(ev.EventSource.sourceObj) Then
                                 Dim f As Form = castObject(Of Form)(ev.EventSource.sourceObj)
                                 If f.Visible And menable Then f.Invoke(Sub()

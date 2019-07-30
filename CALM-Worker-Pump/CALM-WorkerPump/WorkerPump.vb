@@ -365,52 +365,52 @@ Public NotInheritable Class WorkerPump
                         If Not ev.EventSource.parentObjs.Contains(ev.EventSource.sourceObj) Then
                             If canCastObject(Of Control)(ev.EventSource.sourceObj) And Not canCastObject(Of Form)(ev.EventSource.sourceObj) Then
                                 Dim c As Control = castObject(Of Control)(ev.EventSource.sourceObj)
-                                If c.TopLevelControl.Visible And menable Then c.Invoke(Sub()
-                                                                                           Try
-                                                                                               c.Enabled = False
-                                                                                           Catch ex As ThreadAbortException
-                                                                                               Throw ex
-                                                                                           Catch ex As Exception
-                                                                                               RaiseEvent OnPumpException(ex)
-                                                                                           End Try
-                                                                                       End Sub)
+                                If c.TopLevelControl.Visible And menable Then c.TopLevelControl.Invoke(Sub()
+                                                                                                           Try
+                                                                                                               c.Enabled = False
+                                                                                                           Catch ex As ThreadAbortException
+                                                                                                               Throw ex
+                                                                                                           Catch ex As Exception
+                                                                                                               RaiseEvent OnPumpException(ex)
+                                                                                                           End Try
+                                                                                                       End Sub)
                             ElseIf canCastObject(Of Form)(ev.EventSource.sourceObj) Then
                                 Dim f As Form = castObject(Of Form)(ev.EventSource.sourceObj)
-                                If f.Visible And menable Then f.Invoke(Sub()
-                                                                           Try
-                                                                               f.Enabled = False
-                                                                           Catch ex As ThreadAbortException
-                                                                               Throw ex
-                                                                           Catch ex As Exception
-                                                                               RaiseEvent OnPumpException(ex)
-                                                                           End Try
-                                                                       End Sub)
+                                If f.TopLevelControl.Visible And menable Then f.TopLevelControl.Invoke(Sub()
+                                                                                                           Try
+                                                                                                               f.Enabled = False
+                                                                                                           Catch ex As ThreadAbortException
+                                                                                                               Throw ex
+                                                                                                           Catch ex As Exception
+                                                                                                               RaiseEvent OnPumpException(ex)
+                                                                                                           End Try
+                                                                                                       End Sub)
                             End If
                         End If
                         Dim en As Boolean = parseEvents(ev)
                         If Not ev.EventSource.parentObjs.Contains(ev.EventSource.sourceObj) And en Then
                             If canCastObject(Of Control)(ev.EventSource.sourceObj) And Not canCastObject(Of Form)(ev.EventSource.sourceObj) Then
                                 Dim c As Control = castObject(Of Control)(ev.EventSource.sourceObj)
-                                If c.TopLevelControl.Visible And menable Then c.Invoke(Sub()
-                                                                                           Try
-                                                                                               c.Enabled = True
-                                                                                           Catch ex As ThreadAbortException
-                                                                                               Throw ex
-                                                                                           Catch ex As Exception
-                                                                                               RaiseEvent OnPumpException(ex)
-                                                                                           End Try
-                                                                                       End Sub)
+                                If c.TopLevelControl.Visible And menable Then c.TopLevelControl.Invoke(Sub()
+                                                                                                           Try
+                                                                                                               c.Enabled = True
+                                                                                                           Catch ex As ThreadAbortException
+                                                                                                               Throw ex
+                                                                                                           Catch ex As Exception
+                                                                                                               RaiseEvent OnPumpException(ex)
+                                                                                                           End Try
+                                                                                                       End Sub)
                             ElseIf canCastObject(Of Form)(ev.EventSource.sourceObj) Then
                                 Dim f As Form = castObject(Of Form)(ev.EventSource.sourceObj)
-                                If f.Visible And menable Then f.Invoke(Sub()
-                                                                           Try
-                                                                               f.Enabled = True
-                                                                           Catch ex As ThreadAbortException
-                                                                               Throw ex
-                                                                           Catch ex As Exception
-                                                                               RaiseEvent OnPumpException(ex)
-                                                                           End Try
-                                                                       End Sub)
+                                If f.TopLevelControl.Visible And menable Then f.TopLevelControl.Invoke(Sub()
+                                                                                                           Try
+                                                                                                               f.Enabled = True
+                                                                                                           Catch ex As ThreadAbortException
+                                                                                                               Throw ex
+                                                                                                           Catch ex As Exception
+                                                                                                               RaiseEvent OnPumpException(ex)
+                                                                                                           End Try
+                                                                                                       End Sub)
                             End If
                         End If
                         If workerStates.ContainsKey(ev) Then

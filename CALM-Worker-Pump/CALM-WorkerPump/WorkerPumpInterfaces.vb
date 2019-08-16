@@ -21,7 +21,6 @@ Public Interface IEventParser
     ''' Parses a WorkerEvent.
     ''' </summary>
     ''' <param name="ev">The WorkerEvent to parse.</param>
-    ''' <returns>If the source control should be enabled.</returns>
     ''' <remarks></remarks>
-    Function Parse(ev As WorkerEvent) As Boolean
+    Sub Parse(ev As WorkerEvent)
 End Interface

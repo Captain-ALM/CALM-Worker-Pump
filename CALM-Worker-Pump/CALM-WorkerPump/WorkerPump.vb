@@ -19,7 +19,6 @@ Public NotInheritable Class WorkerPump
     Private pump As Boolean = False
     Private parsers As New List(Of IEventParser)
     Private wThread As Thread = Nothing
-    Private menable As Boolean = True
     ''' <summary>
     ''' Creates a new instance of worker pump.
     ''' </summary>
@@ -287,29 +286,6 @@ Public NotInheritable Class WorkerPump
         If cnt < 1 Then toret = False
         Return toret
     End Function
-    ''' <summary>
-    ''' Manages whether controls are disabled before a worker event is parsed and enabled after.
-    ''' </summary>
-    ''' <value>Boolean</value>
-    ''' <returns>If This Option is enabled</returns>
-    ''' <remarks></remarks>
-    Public Property ManageControlEnablement As Boolean
-        Get
-            Return menable
-        End Get
-        Set(value As Boolean)
-            menable = value
-        End Set
-    End Property
-
-    Private Function castForm(Of t As Form)(f As Form) As t
-        Try
-            Dim nf As t = f
-            Return nf
-        Catch ex As InvalidCastException
-            Return Nothing
-        End Try
-    End Function
 
     Private Function canCastForm(Of t As Form)(f As Form) As Boolean
         Try
@@ -317,15 +293,6 @@ Public NotInheritable Class WorkerPump
             Return True
         Catch ex As InvalidCastException
             Return False
-        End Try
-    End Function
-
-    Private Function castParser(Of t As IEventParser)(f As IEventParser) As t
-        Try
-            Dim nf As t = f
-            Return nf
-        Catch ex As InvalidCastException
-            Return Nothing
         End Try
     End Function
 
@@ -362,57 +329,7 @@ Public NotInheritable Class WorkerPump
                 Try
                     While workerQueue.Count > 0
                         Dim ev As WorkerEvent = workerQueue.Dequeue()
-                        If Not ev.EventSource.parentObjs.Contains(ev.EventSource.sourceObj) Then
-                            If canCastObject(Of Control)(ev.EventSource.sourceObj) And Not canCastObject(Of Form)(ev.EventSource.sourceObj) Then
-                                Dim c As Control = castObject(Of Control)(ev.EventSource.sourceObj)
-                                If c.TopLevelControl.Visible And menable Then c.TopLevelControl.Invoke(Sub()
-                                                                                                           Try
-                                                                                                               c.Enabled = False
-                                                                                                           Catch ex As ThreadAbortException
-                                                                                                               Throw ex
-                                                                                                           Catch ex As Exception
-                                                                                                               RaiseEvent OnPumpException(ex)
-                                                                                                           End Try
-                                                                                                       End Sub)
-                            ElseIf canCastObject(Of Form)(ev.EventSource.sourceObj) Then
-                                Dim f As Form = castObject(Of Form)(ev.EventSource.sourceObj)
-                                If f.TopLevelControl.Visible And menable Then f.TopLevelControl.Invoke(Sub()
-                                                                                                           Try
-                                                                                                               f.Enabled = False
-                                                                                                           Catch ex As ThreadAbortException
-                                                                                                               Throw ex
-                                                                                                           Catch ex As Exception
-                                                                                                               RaiseEvent OnPumpException(ex)
-                                                                                                           End Try
-                                                                                                       End Sub)
-                            End If
-                        End If
-                        Dim en As Boolean = parseEvents(ev)
-                        If Not ev.EventSource.parentObjs.Contains(ev.EventSource.sourceObj) And en Then
-                            If canCastObject(Of Control)(ev.EventSource.sourceObj) And Not canCastObject(Of Form)(ev.EventSource.sourceObj) Then
-                                Dim c As Control = castObject(Of Control)(ev.EventSource.sourceObj)
-                                If c.TopLevelControl.Visible And menable Then c.TopLevelControl.Invoke(Sub()
-                                                                                                           Try
-                                                                                                               c.Enabled = True
-                                                                                                           Catch ex As ThreadAbortException
-                                                                                                               Throw ex
-                                                                                                           Catch ex As Exception
-                                                                                                               RaiseEvent OnPumpException(ex)
-                                                                                                           End Try
-                                                                                                       End Sub)
-                            ElseIf canCastObject(Of Form)(ev.EventSource.sourceObj) Then
-                                Dim f As Form = castObject(Of Form)(ev.EventSource.sourceObj)
-                                If f.TopLevelControl.Visible And menable Then f.TopLevelControl.Invoke(Sub()
-                                                                                                           Try
-                                                                                                               f.Enabled = True
-                                                                                                           Catch ex As ThreadAbortException
-                                                                                                               Throw ex
-                                                                                                           Catch ex As Exception
-                                                                                                               RaiseEvent OnPumpException(ex)
-                                                                                                           End Try
-                                                                                                       End Sub)
-                            End If
-                        End If
+                        parseEvents(ev)
                         If workerStates.ContainsKey(ev) Then
                             workerStates.Remove(ev)
                         End If
@@ -433,13 +350,11 @@ Public NotInheritable Class WorkerPump
         pump = False
     End Sub
 
-    Function parseEvents(ev As WorkerEvent) As Boolean
-        Dim toret As Boolean = True
+    Sub parseEvents(ev As WorkerEvent)
         For Each parser As IEventParser In parsers
-            toret = toret And parser.Parse(ev)
+            parser.Parse(ev)
         Next
-        Return toret
-    End Function
+    End Sub
 
 #Region "IDisposable Support"
     Private disposedValue As Boolean = False ' To detect redundant calls

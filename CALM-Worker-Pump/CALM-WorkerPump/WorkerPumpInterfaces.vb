@@ -11,6 +11,7 @@ Public Interface IWorkerPumpReceiver
     ''' <remarks></remarks>
     Property WorkerPump As WorkerPump
 End Interface
+
 ''' <summary>
 ''' This Interface is Used For Event Parsers.
 ''' </summary>

@@ -14,11 +14,11 @@ Public NotInheritable Class WorkerPump
     Public Event OnPumpException(ex As Exception)
 
     Private formInstanceRegistry As New List(Of Form)
-    Private workerQueue As New Queue(Of WorkerEvent)
-    Private workerStates As New Dictionary(Of WorkerEvent, Boolean)
+    Private workerQueue As New LinkedList(Of WorkerEvent)
     Private pump As Boolean = False
     Private parsers As New List(Of IEventParser)
     Private wThread As Thread = Nothing
+    Private slock As New Object()
     ''' <summary>
     ''' Creates a new instance of worker pump.
     ''' </summary>
@@ -57,6 +57,7 @@ Public NotInheritable Class WorkerPump
     ''' <remarks></remarks>
     Public ReadOnly Property PumpBusy As Boolean
         Get
+            If disp Or disping Then Return False
             Return workerQueue.Count > 0
         End Get
     End Property
@@ -66,6 +67,8 @@ Public NotInheritable Class WorkerPump
     ''' <param name="f">The form instance.</param>
     ''' <remarks></remarks>
     Public Sub addFormInstance(Of t As {Form, IWorkerPumpReceiver})(f As t)
+        If disp Or disping Then Throw New ObjectDisposedException("WorkerPump")
+        If f Is Nothing Then Throw New ArgumentNullException("f")
         f.WorkerPump = Me
         formInstanceRegistry.Add(f)
     End Sub
@@ -74,6 +77,7 @@ Public NotInheritable Class WorkerPump
     ''' </summary>
     ''' <remarks></remarks>
     Public Sub startPump()
+        If disp Or disping Then Throw New ObjectDisposedException("WorkerPump")
         pump = True
         wThread.Start()
     End Sub
@@ -84,6 +88,7 @@ Public NotInheritable Class WorkerPump
     ''' <remarks></remarks>
     Public ReadOnly Property Pumping() As Boolean
         Get
+            If disp Or disping Then Return False
             Return pump Or wThread.IsAlive
         End Get
     End Property
@@ -93,6 +98,7 @@ Public NotInheritable Class WorkerPump
     ''' <returns></returns>
     ''' <remarks></remarks>
     Public Function stopPump() As Boolean
+        If disp Or disping Then Throw New ObjectDisposedException("WorkerPump")
         pump = False
         Return Not wThread.IsAlive
     End Function
@@ -101,9 +107,18 @@ Public NotInheritable Class WorkerPump
     ''' </summary>
     ''' <remarks></remarks>
     Public Sub stopPumpForce()
+        If disp Or disping Then Throw New ObjectDisposedException("WorkerPump")
         pump = False
-        If wThread.IsAlive Then wThread.Join(5000)
         If wThread.IsAlive Then wThread.Abort()
+    End Sub
+    ''' <summary>
+    ''' Joins the pump thread for a certain number of milliseconds.
+    ''' </summary>
+    ''' <param name="millisecondsTimeout"></param>
+    ''' <remarks></remarks>
+    Public Sub joinPump(millisecondsTimeout As Integer)
+        If disp Or disping Then Throw New ObjectDisposedException("WorkerPump")
+        If wThread.IsAlive Then wThread.Join(millisecondsTimeout)
     End Sub
     ''' <summary>
     ''' Adds an event to the EventQueue of the pump.
@@ -111,10 +126,21 @@ Public NotInheritable Class WorkerPump
     ''' <param name="ev">The Worker Event</param>
     ''' <remarks></remarks>
     Public Sub addEvent(ev As WorkerEvent)
-        If Not workerStates.ContainsKey(ev) Then
-            workerQueue.Enqueue(ev)
-            workerStates.Add(ev, True)
-        End If
+        If disp Or disping Then Throw New ObjectDisposedException("WorkerPump")
+        If ev Is Nothing Then Throw New ArgumentNullException("ev")
+        SyncLock slock
+            If workerQueue.Contains(ev) Then
+                If ev.EventReplaceMode <> ReplaceMode.KeepExisting Then
+                    If ev.EventReplaceMode = ReplaceMode.Queue Then
+                        workerQueue.AddLast(ev)
+                    Else
+                        workerQueue.FindLast(ev).Value = ev
+                    End If
+                End If
+            Else
+                workerQueue.AddLast(ev)
+            End If
+        End SyncLock
     End Sub
     ''' <summary>
     ''' Adds an event to the EventQueue of the pump.
@@ -124,11 +150,7 @@ Public NotInheritable Class WorkerPump
     ''' <param name="ed">Event Args</param>
     ''' <remarks></remarks>
     Public Sub addEvent(es As Object, et As EventType, ed As EventArgs)
-        Dim ev As New WorkerEvent(es, et, ed)
-        If Not workerStates.ContainsKey(ev) Then
-            workerQueue.Enqueue(ev)
-            workerStates.Add(ev, True)
-        End If
+        addEvent(New WorkerEvent(es, et, ed))
     End Sub
     ''' <summary>
     ''' Adds an event to the EventQueue of the pump.
@@ -140,28 +162,18 @@ Public NotInheritable Class WorkerPump
     ''' <param name="ed">Event Args</param>
     ''' <remarks></remarks>
     Public Sub addEvent(Of t)(es As Object, sp As t, et As EventType, ed As EventArgs)
-        Dim evpl As New List(Of Object)
-        evpl.Add(sp)
-        Dim ev As New WorkerEvent(es, evpl, et, ed)
-        If Not workerStates.ContainsKey(ev) Then
-            workerQueue.Enqueue(ev)
-            workerStates.Add(ev, True)
-        End If
+        addEvent(New WorkerEvent(es, New Object() {sp}, et, ed))
     End Sub
     ''' <summary>
     ''' Adds an event to the EventQueue of the pump.
     ''' </summary>
     ''' <param name="es">Event Source Object</param>
-    ''' <param name="sops">Event Source Parent Object List</param>
+    ''' <param name="sops">Event Source Parent Object Array</param>
     ''' <param name="et">Event Type</param>
     ''' <param name="ed">Event Args</param>
     ''' <remarks></remarks>
-    Public Sub addEvent(es As Object, sops As List(Of Object), et As EventType, ed As EventArgs)
-        Dim ev As New WorkerEvent(es, sops, et, ed)
-        If Not workerStates.ContainsKey(ev) Then
-            workerQueue.Enqueue(ev)
-            workerStates.Add(ev, True)
-        End If
+    Public Sub addEvent(es As Object, sops As Object(), et As EventType, ed As EventArgs)
+        addEvent(New WorkerEvent(es, sops, et, ed))
     End Sub
     ''' <summary>
     ''' Adds an event parser to the pump.
@@ -169,6 +181,8 @@ Public NotInheritable Class WorkerPump
     ''' <param name="p">The Parser instance.</param>
     ''' <remarks></remarks>
     Public Sub addParser(p As IEventParser)
+        If disp Or disping Then Throw New ObjectDisposedException("WorkerPump")
+        If p Is Nothing Then Throw New ArgumentNullException("p")
         p.WorkerPump = Me
         parsers.Add(p)
     End Sub
@@ -181,6 +195,7 @@ Public NotInheritable Class WorkerPump
     ''' <returns></returns>
     ''' <remarks></remarks>
     Public Function showForm(Of t As Form)(Optional index As Integer = 0, Optional owner As Form = Nothing) As Boolean
+        If disp Or disping Then Throw New ObjectDisposedException("WorkerPump")
         Dim ci As Integer = 0
         If index < 0 Then Return False
         For Each cf As Form In formInstanceRegistry
@@ -207,6 +222,7 @@ Public NotInheritable Class WorkerPump
     ''' <returns></returns>
     ''' <remarks></remarks>
     Public Function removeForm(Of t As Form)(Optional index As Integer = 0) As Boolean
+        If disp Or disping Then Throw New ObjectDisposedException("WorkerPump")
         Dim ci As Integer = 0
         If index < 0 Then Return False
         For Each cf As Form In formInstanceRegistry
@@ -231,6 +247,7 @@ Public NotInheritable Class WorkerPump
     ''' <returns></returns>
     ''' <remarks></remarks>
     Public Function removeForms(Of t As Form)() As Boolean
+        If disp Or disping Then Throw New ObjectDisposedException("WorkerPump")
         Dim toret As Boolean = True
         Dim cnt As Integer = 0
         For Each cf As Form In formInstanceRegistry
@@ -254,6 +271,7 @@ Public NotInheritable Class WorkerPump
     ''' <returns></returns>
     ''' <remarks></remarks>
     Public Function removeParser(Of t As IEventParser)(Optional index As Integer = 0) As Boolean
+        If disp Or disping Then Throw New ObjectDisposedException("WorkerPump")
         Dim frm As Form = Nothing
         Dim ci As Integer = 0
         If index < 0 Then Return False
@@ -275,6 +293,7 @@ Public NotInheritable Class WorkerPump
     ''' <returns></returns>
     ''' <remarks></remarks>
     Public Function removeParsers(Of t As IEventParser)() As Boolean
+        If disp Or disping Then Throw New ObjectDisposedException("WorkerPump")
         Dim toret As Boolean = True
         Dim cnt As Integer = 0
         For Each cf As IEventParser In parsers
@@ -288,21 +307,11 @@ Public NotInheritable Class WorkerPump
     End Function
 
     Private Function canCastForm(Of t As Form)(f As Form) As Boolean
-        Try
-            Dim nf As t = f
-            Return True
-        Catch ex As InvalidCastException
-            Return False
-        End Try
+        Return GetType(t).IsAssignableFrom(f.GetType())
     End Function
 
     Private Function canCastParser(Of t As IEventParser)(f As IEventParser) As Boolean
-        Try
-            Dim nf As t = f
-            Return True
-        Catch ex As InvalidCastException
-            Return False
-        End Try
+        Return GetType(t).IsAssignableFrom(f.GetType())
     End Function
 
     Private Function castObject(Of t)(f As Object) As t
@@ -315,12 +324,7 @@ Public NotInheritable Class WorkerPump
     End Function
 
     Private Function canCastObject(Of t)(f As Object) As Boolean
-        Try
-            Dim nf As t = f
-            Return True
-        Catch ex As InvalidCastException
-            Return False
-        End Try
+        Return GetType(t).IsAssignableFrom(f.GetType())
     End Function
 
     Private Sub workerRunner()
@@ -328,12 +332,12 @@ Public NotInheritable Class WorkerPump
             While pump
                 Try
                     While workerQueue.Count > 0
-                        Dim ev As WorkerEvent = workerQueue.Dequeue()
+                        Dim ev As WorkerEvent = Nothing
+                        SyncLock slock
+                            ev = workerQueue.First.Value
+                            workerQueue.RemoveFirst()
+                        End SyncLock
                         parseEvents(ev)
-                        If workerStates.ContainsKey(ev) Then
-                            workerStates.Remove(ev)
-                        End If
-                        Thread.Sleep(125)
                     End While
                 Catch ex As ThreadAbortException
                     Throw ex
@@ -351,6 +355,7 @@ Public NotInheritable Class WorkerPump
     End Sub
 
     Sub parseEvents(ev As WorkerEvent)
+        If disp Or disping Then Throw New ObjectDisposedException("WorkerPump")
         For Each parser As IEventParser In parsers
             parser.Parse(ev)
         Next
@@ -367,7 +372,6 @@ Public NotInheritable Class WorkerPump
             If disposing Then
                 Me.disping = True
                 workerQueue.Clear()
-                workerStates.Clear()
                 For Each frm As Form In formInstanceRegistry
                     If Not frm.IsDisposed And Not frm.Disposing Then
                         frm.Dispose()
@@ -383,25 +387,17 @@ Public NotInheritable Class WorkerPump
                 parsers.Clear()
             End If
 
-            ' t.o.d.o. free unmanaged resources (unmanaged objects) and override Finalize() below.
             wThread = Nothing
             pump = Nothing
             workerQueue = Nothing
-            workerStates = Nothing
             formInstanceRegistry = Nothing
             parsers = Nothing
+            slock = Nothing
             Me.disping = False
             Me.disp = True
         End If
         Me.disposedValue = True
     End Sub
-
-    't.o.d.o. override Finalize() only if Dispose(ByVal disposing As Boolean) above has code to free unmanaged resources.
-    'Protected Overrides Sub Finalize()
-    '    ' Do not change this code.  Put cleanup code in Dispose(ByVal disposing As Boolean) above.
-    '    Dispose(False)
-    '    MyBase.Finalize()
-    'End Sub
 
     ' This code added by Visual Basic to correctly implement the disposable pattern.
     ''' <summary>
@@ -412,7 +408,6 @@ Public NotInheritable Class WorkerPump
         ' Do not change this code.  Put cleanup code in Dispose(disposing As Boolean) above.
         If Pumping() Then Throw New InvalidOperationException("Stop the workerpump before disposing.")
         Dispose(True)
-        GC.SuppressFinalize(Me)
     End Sub
 #End Region
 
